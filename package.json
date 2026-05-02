@@ -1,0 +1,11 @@
+{
+  "name": "kinara-pi-extensions",
+  "version": "1.0.0",
+  "description": "Kinara's pi coding agent extensions collection",
+  "keywords": ["pi-package"],
+  "author": "Kinara Jongga <kinarajong23@gmail.com>",
+  "license": "MIT",
+  "pi": {
+    "extensions": ["./extensions"]
+  }
+}
