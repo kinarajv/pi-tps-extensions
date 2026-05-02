@@ -10,7 +10,8 @@ Shows real-time token throughput in the pi status bar during streaming.
 
 | Phase | Status bar |
 |-------|------------|
-| Idle | `⏺ idle` |
+| First idle | `⏺ idle` |
+| Idle (after usage) | `⏺ avg 156 tok/s ↑2.3k ↓8.8k` |
 | Streaming | `⚡ 142 tok/s ↑12k ↓8k` |
 | Finished | `⚡ 156 tok/s ↓823 (5.2s)` |
 

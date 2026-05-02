@@ -1,6 +1,6 @@
 {
   "name": "@kinarajv/pi-tps-extensions",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "Token-per-sec extensions — real-time token throughput display for pi coding agent",
   "keywords": ["pi-package"],
   "author": "Kinara Jongga <kinarajong23@gmail.com>",
