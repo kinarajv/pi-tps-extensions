@@ -17,10 +17,7 @@ export default function (pi: ExtensionAPI) {
   let lastTps = 0;
   let totalInput = 0;
   let totalOutput = 0;
-
-  pi.on("session_start", async (_event, ctx) => {
-    ctx.ui.setStatus("tps", ctx.ui.theme.fg("dim", "⏺ idle"));
-  });
+  let totalStreamTime = 0;
 
   pi.on("turn_start", async (_event, ctx) => {
     streaming = false;
@@ -66,6 +63,7 @@ export default function (pi: ExtensionAPI) {
     const outputTokens = event.message.usage?.output ?? 0;
     totalInput += event.message.usage?.input ?? 0;
     totalOutput += outputTokens;
+    totalStreamTime += elapsed;
 
     const theme = ctx.ui.theme;
     if (elapsed > 0.1 && outputTokens > 0) {
@@ -83,11 +81,25 @@ export default function (pi: ExtensionAPI) {
     streaming = false;
   });
 
-  pi.on("turn_end", async (_event, ctx) => {
-    if (!streaming) {
-      const theme = ctx.ui.theme;
-      ctx.ui.setStatus("tps", theme.fg("dim", `⏺ idle  ↑${fmt(totalInput)} ↓${fmt(totalOutput)}`));
+  function showIdle(ctx: any) {
+    const theme = ctx.ui.theme;
+    if (totalStreamTime > 0 && totalOutput > 0) {
+      const avgTps = totalOutput / totalStreamTime;
+      const avg = theme.fg("dim", `⏺ avg `);
+      const speed = theme.fg("accent", `${avgTps.toFixed(0)}`);
+      const label = theme.fg("dim", ` tok/s ↑${fmt(totalInput)} ↓${fmt(totalOutput)}`);
+      ctx.ui.setStatus("tps", `${avg}${speed}${label}`);
+    } else {
+      ctx.ui.setStatus("tps", theme.fg("dim", `⏺ idle`));
     }
+  }
+
+  pi.on("session_start", async (_event, ctx) => {
+    showIdle(ctx);
+  });
+
+  pi.on("turn_end", async (_event, ctx) => {
+    if (!streaming) showIdle(ctx);
   });
 }
 
