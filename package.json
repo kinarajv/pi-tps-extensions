@@ -1,6 +1,6 @@
 {
-  "name": "pi-tokenpersec-extensions",
-  "version": "1.0.1",
+  "name": "@kinarajv/pi-tps-extensions",
+  "version": "1.0.2",
   "description": "Kinara's pi coding agent extensions collection",
   "keywords": ["pi-package"],
   "author": "Kinara Jongga <kinarajong23@gmail.com>",
