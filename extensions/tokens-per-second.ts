@@ -5,13 +5,23 @@
  * Falls back to estimated TPS (chars/4) while streaming, then shows actual
  * TPS from usage.output on message_end. Also tracks TTFT (Time To First Token).
  *
- * Status bar phases:
+ * Commands:
+ *   /tps          — toggle input/output token counts
+ *   /tps compact  — toggle compact mode (57t/s, 2.9s)
+ *
+ * Status bar phases (full mode):
  *   First idle         — ⏺ idle
  *   Waiting (no data)  — ⏳ waiting...
  *   Waiting (has data) — ⏳ waiting·last 1.2s...
  *   Streaming          — ⚡ 142 tok/s · 🕐 1.2s ↑12k ↓8k
  *   Finished           — ⚡ 156 tok/s 🕐1.2s ↓823 (5.2s)
  *   Idle (avg)         — ⏺ avg 156 tok/s · 🕐 1.3s ↑2.3k ↓8.8k
+ *
+ * Status bar phases (compact mode):
+ *   Waiting            — waiting...
+ *   Streaming          — 142t/s, 1.2s ↑12k ↓8k
+ *   Finished           — 156t/s, 1.2s ↓823 (5.2s)
+ *   Idle (avg)         — 57t/s, 2.9s ↑2.3k ↓8.8k
  *
  * Usage: place in ~/.pi/agent/extensions/ or run with pi -e tokens-per-second.ts
  */
@@ -27,24 +37,40 @@ export default function (pi: ExtensionAPI) {
   let totalOutput = 0;
   let totalStreamTime = 0;
   let showInOut = true;
+  let compact = false;
   let turnStart = 0;
   let lastTtft = 0;
   let ttftSamples: number[] = [];
 
   pi.registerCommand("tps", {
-    description: "Toggle showing input/output token counts in status bar",
-    handler: async (_args, ctx) => {
-      showInOut = !showInOut;
+    description: "Toggle token display options. Usage: /tps [compact]",
+    handler: async (args, ctx) => {
       const theme = ctx.ui.theme;
-      const state = showInOut
-        ? theme.fg("success", "ON")
-        : theme.fg("dim", "OFF");
-      const label = theme.fg("dim", showInOut
-        ? " — showing ↑↓ token counts"
-        : " — only TPS + status");
-      ctx.ui.notify(`Show in/out tokens: ${state}${label}`, "info");
+      if (args === "compact") {
+        compact = !compact;
+        const state = compact
+          ? theme.fg("success", "compact")
+          : theme.fg("dim", "full");
+        ctx.ui.notify(`Display mode: ${state}`, "info");
+        update(ctx);
+      } else {
+        showInOut = !showInOut;
+        const state = showInOut
+          ? theme.fg("success", "ON")
+          : theme.fg("dim", "OFF");
+        const label = theme.fg("dim", showInOut
+          ? " — showing ↑↓ token counts"
+          : " — only TPS + status");
+        ctx.ui.notify(`Show in/out tokens: ${state}${label}`, "info");
+        update(ctx);
+      }
     },
   });
+
+  function update(ctx: { ui: { setStatus: (k: string, v: string) => void }; theme: any }) {
+    if (streaming) return;
+    showIdle(ctx);
+  }
 
   function inOut() {
     return showInOut ? ` ↑${fmt(totalInput)} ↓${fmt(totalOutput)}` : "";
@@ -65,15 +91,34 @@ export default function (pi: ExtensionAPI) {
     return sum / recent.length;
   }
 
-  function renderTtft(): string {
-    if (lastTtft <= 0) return "";
-    return ` · 🕐 ${lastTtft.toFixed(1)}s`;
+  // -- Compact render helpers --
+
+  function compactTps(tps: number): string {
+    return `${tps.toFixed(0)}t/s`;
   }
 
-  function renderIdleTtft(): string {
+  function compactTtft(): string {
+    if (lastTtft <= 0) return "";
+    return `, ${lastTtft.toFixed(1)}s`;
+  }
+
+  function compactIdleTtft(): string {
     const avg = ttftAvg();
     if (avg <= 0) return "";
-    return ` · 🕐 ${avg.toFixed(1)}s`;
+    return `, ${avg.toFixed(1)}s`;
+  }
+
+  // -- Full render helpers --
+
+  function fullTtft(): string {
+    if (lastTtft <= 0) return "";
+    return ` \u00b7 \u{1F550} ${lastTtft.toFixed(1)}s`;
+  }
+
+  function fullIdleTtft(): string {
+    const avg = ttftAvg();
+    if (avg <= 0) return "";
+    return ` \u00b7 \u{1F550} ${avg.toFixed(1)}s`;
   }
 
   function saveTtft() {
@@ -83,6 +128,8 @@ export default function (pi: ExtensionAPI) {
     }
   }
 
+  // -- Events --
+
   pi.on("turn_start", async (_event, ctx) => {
     streaming = false;
     streamStart = 0;
@@ -90,7 +137,9 @@ export default function (pi: ExtensionAPI) {
     turnStart = performance.now();
     lastTtft = 0;
     const theme = ctx.ui.theme;
-    if (totalInput + totalOutput > 0 && ttftSamples.length > 0) {
+    if (compact) {
+      ctx.ui.setStatus("tps", theme.fg("dim", "waiting..."));
+    } else if (totalInput + totalOutput > 0 && ttftSamples.length > 0) {
       ctx.ui.setStatus("tps", theme.fg("dim", `⏳ waiting·last ${lastTtftAvg().toFixed(1)}s...`));
     } else {
       ctx.ui.setStatus("tps", theme.fg("dim", "⏳ waiting..."));
@@ -121,9 +170,14 @@ export default function (pi: ExtensionAPI) {
       lastTps = tps;
 
       const theme = ctx.ui.theme;
-      const speed = theme.fg("accent", `${tps.toFixed(0)}`);
-      const label = theme.fg("dim", " tok/s");
-      ctx.ui.setStatus("tps", `⚡ ${speed}${label}${renderTtft()}${inOut()}`);
+      if (compact) {
+        const speed = theme.fg("accent", compactTps(tps));
+        ctx.ui.setStatus("tps", `${speed}${compactTtft()}${inOut()}`);
+      } else {
+        const speed = theme.fg("accent", `${tps.toFixed(0)}`);
+        const label = theme.fg("dim", " tok/s");
+        ctx.ui.setStatus("tps", `⚡ ${speed}${label}${fullTtft()}${inOut()}`);
+      }
     }
   });
 
@@ -140,33 +194,52 @@ export default function (pi: ExtensionAPI) {
     if (elapsed > 0.1 && outputTokens > 0) {
       const tps = outputTokens / elapsed;
       lastTps = tps;
-      const speed = theme.fg("success", `${tps.toFixed(0)}`);
-      const label = theme.fg("dim", " tok/s");
-      const ttft = lastTtft > 0 ? ` ${theme.fg("dim", `🕐${lastTtft.toFixed(1)}s`)}` : "";
-      const time = theme.fg("dim", `(${elapsed.toFixed(1)}s)`);
-      if (showInOut) {
-        const out = theme.fg("accent", `↓${outputTokens}`);
-        ctx.ui.setStatus("tps", `⚡ ${speed}${label}${ttft} ${out} ${time}`);
+
+      if (compact) {
+        const speed = theme.fg("success", compactTps(tps));
+        const ttft = lastTtft > 0 ? `, ${lastTtft.toFixed(1)}s` : "";
+        const time = theme.fg("dim", `(${elapsed.toFixed(1)}s)`);
+        if (showInOut) {
+          const out = theme.fg("accent", `↓${outputTokens}`);
+          ctx.ui.setStatus("tps", `${speed}${ttft} ${out} ${time}`);
+        } else {
+          ctx.ui.setStatus("tps", `${speed}${ttft} ${time}`);
+        }
       } else {
-        ctx.ui.setStatus("tps", `⚡ ${speed}${label}${ttft} ${time}`);
+        const speed = theme.fg("success", `${tps.toFixed(0)}`);
+        const label = theme.fg("dim", " tok/s");
+        const ttft = lastTtft > 0 ? ` ${theme.fg("dim", `🕐${lastTtft.toFixed(1)}s`)}` : "";
+        const time = theme.fg("dim", `(${elapsed.toFixed(1)}s)`);
+        if (showInOut) {
+          const out = theme.fg("accent", `↓${outputTokens}`);
+          ctx.ui.setStatus("tps", `⚡ ${speed}${label}${ttft} ${out} ${time}`);
+        } else {
+          ctx.ui.setStatus("tps", `⚡ ${speed}${label}${ttft} ${time}`);
+        }
       }
     } else {
-      ctx.ui.setStatus("tps", theme.fg("dim", "⏺ done"));
+      ctx.ui.setStatus("tps", theme.fg("dim", compact ? "done" : "⏺ done"));
     }
 
     streaming = false;
   });
 
-  function showIdle(ctx: ExtensionContext) {
+  function showIdle(ctx: { ui: { setStatus: (k: string, v: string) => void }; theme: any }) {
     const theme = ctx.ui.theme;
     if (totalStreamTime > 0 && totalOutput > 0) {
       const avgTps = totalOutput / totalStreamTime;
-      const avg = theme.fg("dim", "⏺ avg ");
-      const speed = theme.fg("accent", `${avgTps.toFixed(0)}`);
-      const label = theme.fg("dim", " tok/s");
-      ctx.ui.setStatus("tps", `${avg}${speed}${label}${renderIdleTtft()}${inOut()}`);
+
+      if (compact) {
+        const speed = theme.fg("accent", compactTps(avgTps));
+        ctx.ui.setStatus("tps", `${speed}${compactIdleTtft()}${inOut()}`);
+      } else {
+        const avg = theme.fg("dim", "⏺ avg ");
+        const speed = theme.fg("accent", `${avgTps.toFixed(0)}`);
+        const label = theme.fg("dim", " tok/s");
+        ctx.ui.setStatus("tps", `${avg}${speed}${label}${fullIdleTtft()}${inOut()}`);
+      }
     } else {
-      ctx.ui.setStatus("tps", theme.fg("dim", "⏺ idle"));
+      ctx.ui.setStatus("tps", theme.fg("dim", compact ? "idle" : "⏺ idle"));
     }
   }
 
