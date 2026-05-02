@@ -18,6 +18,27 @@ export default function (pi: ExtensionAPI) {
   let totalInput = 0;
   let totalOutput = 0;
   let totalStreamTime = 0;
+  let showInOut = true;
+
+  pi.registerCommand({
+    name: "tps",
+    description: "Toggle showing input/output token counts in status bar",
+    callback: async (_args, ctx) => {
+      showInOut = !showInOut;
+      const theme = ctx.ui.theme;
+      const state = showInOut
+        ? theme.fg("success", "ON")
+        : theme.fg("dim", "OFF");
+      const label = theme.fg("dim", showInOut
+        ? " — showing ↑↓ token counts"
+        : " — only TPS + status");
+      ctx.ui.setMessage(`Show in/out tokens: ${state}${label}`);
+    },
+  });
+
+  function inOut() {
+    return showInOut ? ` ↑${fmt(totalInput)} ↓${fmt(totalOutput)}` : "";
+  }
 
   pi.on("turn_start", async (_event, ctx) => {
     streaming = false;
@@ -51,8 +72,7 @@ export default function (pi: ExtensionAPI) {
       const theme = ctx.ui.theme;
       const speed = theme.fg("accent", `${tps.toFixed(0)}`);
       const label = theme.fg("dim", " tok/s");
-      const total = theme.fg("dim", ` ↑${fmt(totalInput)} ↓${fmt(totalOutput)}`);
-      ctx.ui.setStatus("tps", `⚡ ${speed}${label} ${total}`);
+      ctx.ui.setStatus("tps", `⚡ ${speed}${label}${inOut()}`);
     }
   });
 
@@ -72,8 +92,12 @@ export default function (pi: ExtensionAPI) {
       const speed = theme.fg("success", `${tps.toFixed(0)}`);
       const label = theme.fg("dim", " tok/s ");
       const time = theme.fg("dim", `(${elapsed.toFixed(1)}s)`);
-      const out = theme.fg("accent", `↓${outputTokens}`);
-      ctx.ui.setStatus("tps", `⚡ ${speed}${label}${out} ${time}`);
+      if (showInOut) {
+        const out = theme.fg("accent", `↓${outputTokens}`);
+        ctx.ui.setStatus("tps", `⚡ ${speed}${label}${out} ${time}`);
+      } else {
+        ctx.ui.setStatus("tps", `⚡ ${speed}${label}${time}`);
+      }
     } else {
       ctx.ui.setStatus("tps", theme.fg("dim", `⏺ done`));
     }
@@ -87,7 +111,7 @@ export default function (pi: ExtensionAPI) {
       const avgTps = totalOutput / totalStreamTime;
       const avg = theme.fg("dim", `⏺ avg `);
       const speed = theme.fg("accent", `${avgTps.toFixed(0)}`);
-      const label = theme.fg("dim", ` tok/s ↑${fmt(totalInput)} ↓${fmt(totalOutput)}`);
+      const label = theme.fg("dim", ` tok/s${inOut()}`);
       ctx.ui.setStatus("tps", `${avg}${speed}${label}`);
     } else {
       ctx.ui.setStatus("tps", theme.fg("dim", `⏺ idle`));
