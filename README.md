@@ -15,6 +15,19 @@ Shows real-time token throughput in the pi status bar during streaming.
 | Streaming | `⚡ 142 tok/s ↑12k ↓8k` |
 | Finished | `⚡ 156 tok/s ↓823 (5.2s)` |
 
+## Configuration
+
+### `/tps` — Toggle input/output token display
+
+Run `/tps` to show or hide the `↑` (input) and `↓` (output) token counts in the status bar.
+
+| Setting | Status bar |
+|---------|------------|
+| Show (default) | `⚡ 142 tok/s ↑12k ↓8k` |
+| Hide | `⚡ 142 tok/s` |
+
+When hidden, only TPS speed and status labels remain visible — keeps the status bar compact.
+
 ## Install
 
 ```bash
