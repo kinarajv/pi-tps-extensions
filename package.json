@@ -1,10 +1,14 @@
 {
   "name": "@kinarajv/pi-tps-extensions",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Token-per-sec extensions — real-time token throughput display for pi coding agent",
   "keywords": ["pi-package"],
   "author": "Kinara Jongga <kinarajong23@gmail.com>",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kinarajv/pi-tps-extensions.git"
+  },
   "pi": {
     "extensions": ["./extensions"]
   }
