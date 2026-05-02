@@ -1,6 +1,6 @@
-# pi-extensions
+# Token-per-sec Extensions
 
-Collection of my [pi coding agent](https://github.com/badlogic/pi-mono/) extensions.
+Real-time token throughput extensions for [pi coding agent](https://github.com/badlogic/pi-mono/).
 
 ## Extensions
 
@@ -17,7 +17,7 @@ Shows real-time token throughput in the pi status bar during streaming.
 ## Install
 
 ```bash
-pi install git:github.com/kinarajv/pi-extensions
+pi install npm:@kinarajv/pi-tps-extensions
 ```
 
 Or manually:
