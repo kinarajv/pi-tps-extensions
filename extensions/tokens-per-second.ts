@@ -8,7 +8,7 @@
  * Usage: place in ~/.pi/agent/extensions/ or run with pi -e tokens-per-second.ts
  */
 
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
 
 export default function (pi: ExtensionAPI) {
   let streaming = false;
@@ -20,10 +20,9 @@ export default function (pi: ExtensionAPI) {
   let totalStreamTime = 0;
   let showInOut = true;
 
-  pi.registerCommand({
-    name: "tps",
+  pi.registerCommand("tps", {
     description: "Toggle showing input/output token counts in status bar",
-    callback: async (_args, ctx) => {
+    handler: async (_args, ctx) => {
       showInOut = !showInOut;
       const theme = ctx.ui.theme;
       const state = showInOut
@@ -32,7 +31,7 @@ export default function (pi: ExtensionAPI) {
       const label = theme.fg("dim", showInOut
         ? " — showing ↑↓ token counts"
         : " — only TPS + status");
-      ctx.ui.setMessage(`Show in/out tokens: ${state}${label}`);
+      ctx.ui.notify(`Show in/out tokens: ${state}${label}`, "info");
     },
   });
 
@@ -42,6 +41,7 @@ export default function (pi: ExtensionAPI) {
 
   pi.on("turn_start", async (_event, ctx) => {
     streaming = false;
+    streamStart = 0;
     charsAccumulated = 0;
     ctx.ui.setStatus("tps", ctx.ui.theme.fg("dim", "⏳ waiting..."));
   });
@@ -79,11 +79,11 @@ export default function (pi: ExtensionAPI) {
   pi.on("message_end", async (event, ctx) => {
     if (event.message.role !== "assistant") return;
 
-    const elapsed = (performance.now() - streamStart) / 1000;
+    const elapsed = streamStart > 0 ? (performance.now() - streamStart) / 1000 : 0;
     const outputTokens = event.message.usage?.output ?? 0;
     totalInput += event.message.usage?.input ?? 0;
     totalOutput += outputTokens;
-    totalStreamTime += elapsed;
+    if (elapsed > 0.1) totalStreamTime += elapsed;
 
     const theme = ctx.ui.theme;
     if (elapsed > 0.1 && outputTokens > 0) {
@@ -105,7 +105,7 @@ export default function (pi: ExtensionAPI) {
     streaming = false;
   });
 
-  function showIdle(ctx: any) {
+  function showIdle(ctx: ExtensionContext) {
     const theme = ctx.ui.theme;
     if (totalStreamTime > 0 && totalOutput > 0) {
       const avgTps = totalOutput / totalStreamTime;
